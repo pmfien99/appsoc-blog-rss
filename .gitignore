@@ -1,0 +1,8 @@
+# Ignore the createWebhook.js file (to keep API keys secret)
+createWebhook.js
+
+# Ignore node_modules (in case you have any npm packages installed)
+node_modules/
+
+# Ignore .env file if you store environment variables in it
+.env

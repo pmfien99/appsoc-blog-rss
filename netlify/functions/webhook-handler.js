@@ -11,7 +11,8 @@ exports.handler = async (event) => {
   const body = JSON.parse(event.body);
   const { triggerType, payload } = body;
 
-  const getCollectionItem = (id) => {
+  // Make this function asynchronous
+  const getCollectionItem = async (id) => {
     const options = {
       method: 'GET',
       headers: {
@@ -20,28 +21,41 @@ exports.handler = async (event) => {
       }
     };
 
-    fetch(`https://api.webflow.com/beta/collections/${collectionID}/items/${id}`, options)
-    .then(response => response.json())
-    .then(response => console.log(response))
-    .catch(err => console.error(err));
-  }
+    try {
+      const response = await fetch(`https://api.webflow.com/beta/collections/${collectionID}/items/${id}`, options);
+      const data = await response.json();
+      return data; 
+    } catch (err) {
+      console.error('Error fetching collection item:', err);
+      throw err; 
+    }
+  };
 
   // Check if the webhook is for the correct collection ID
   if (payload.collectionId === collectionID) {
     if (triggerType === "collection_item_created") {
-      
       console.log("New blog created");
-      if (payload.isArchived != false && payload.isDraft != false) {
-        const postData = getCollectionItem(payload.id);
-        console.log(postData);
+
+      // Ensure the post is not archived or draft
+      if (!payload.isArchived && !payload.isDraft) {
+        try {
+          const postData = await getCollectionItem(payload.id);  
+          console.log(postData); 
+        } catch (error) {
+          console.error("Error processing collection item:", error);
+        }
       }
 
     } else if (triggerType === "collection_item_changed") {
+      console.log("Blog updated");
 
-      console.log("blog updated");
-      if (payload.isArchived != false && payload.isDraft != false) {
-        const postData = getCollectionItem(payload.id);
-        console.log(postData);
+      if (!payload.isArchived && !payload.isDraft) {
+        try {
+          const postData = await getCollectionItem(payload.id); 
+          console.log(postData);
+        } catch (error) {
+          console.error("Error processing collection item:", error);
+        }
       }
 
     } else if (triggerType === "collection_item_deleted") {

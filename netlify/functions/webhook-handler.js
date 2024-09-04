@@ -1,6 +1,7 @@
 const fs = require('fs');
+const path = require('path'); 
 const { parse, j2xParser } = require('fast-xml-parser');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); 
 
 const siteId = process.env.WEBFLOW_SITE_ID;
 const accessToken = process.env.WEBFLOW_API_ACCESS_TOKEN;
@@ -12,18 +13,18 @@ exports.handler = async (event) => {
 
   console.log("Webhook received from Webflow:", body);
 
-  if (payload.collectionId == collectionID) {
-    if ( triggerType = "collection_item_created" ) {
-      console.log("New blog created")
-    } else if ( triggerType = "collection_item_changed" ) {
-      console.log("blog updated")
-    } else if ( triggerType = "collection_item_deleted" ) {
-      console.log("blog deleted")
+  // Check if the webhook is for the correct collection ID
+  if (payload.collectionId === collectionID) {
+    if (triggerType === "collection_item_created") {
+      console.log("New blog created");
+    } else if (triggerType === "collection_item_changed") {
+      console.log("Blog updated");
+    } else if (triggerType === "collection_item_deleted") {
+      console.log("Blog deleted");
     }
   } else {
-    console.log("this is NOT an update to the blog collection")
+    console.log("This is NOT an update to the blog collection");
   }
-
 
   const rssFilePath = 'rss.xml';
 

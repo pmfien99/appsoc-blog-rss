@@ -1,0 +1,16 @@
+{
+  "name": "appsoc-blog-rss",
+  "version": "1.0.0",
+  "description": "Managed RSS feed for AppSoc blog posts",
+  "main": "createWebhook.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "fast-xml-parser": "^4.5.0"
+  }
+}

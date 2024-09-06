@@ -32,10 +32,16 @@ const getCollectionItem = async (id) => {
 // Function to read the existing RSS file
 const readRSSFile = () => {
   if (fs.existsSync(rssFilePath)) {
-    const rssData = fs.readFileSync(rssFilePath, 'utf8');
-    return parse(rssData, { ignoreAttributes: false });
+    console.log("Rss file exists, reading file...");
+    try {
+      const rssData = fs.readFileSync(rssFilePath, 'utf8');
+      console.log("RSS file read successfully");
+      return parse(rssData, { ignoreAttributes: false });
+    } catch (err) {
+      console.error("Error reading RSS file:", err);
+    }
   } else {
-    // If the file does not exist, return a new RSS structure
+    console.log("RSS file does not exist, creating new structure...");
     return {
       rss: {
         "@_version": "2.0",
@@ -53,9 +59,15 @@ const readRSSFile = () => {
 
 // Function to write the updated RSS data to the file
 const writeRSSFile = (rssData) => {
-  const builder = new j2xParser({ ignoreAttributes: false, format: true });
-  const xml = builder.parse(rssData);
-  fs.writeFileSync(rssFilePath, xml, 'utf8');
+  console.log("Attempting to write to rss.xml file...");
+  try {
+    const builder = new j2xParser({ ignoreAttributes: false, format: true });
+    const xml = builder.parse(rssData);
+    fs.writeFileSync(rssFilePath, xml, 'utf8');
+    console.log("RSS file updated successfully");
+  } catch (err) {
+    console.error("Error writing to RSS file:", err);
+  }
 };
 
 const updateRSSFeed = (rssData, postData) => {

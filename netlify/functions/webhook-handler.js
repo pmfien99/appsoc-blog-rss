@@ -1,6 +1,7 @@
 const AWS = require("aws-sdk");
 const { XMLBuilder, parse } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
+const path = require('path');
 
 const s3 = new AWS.S3({
   accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,

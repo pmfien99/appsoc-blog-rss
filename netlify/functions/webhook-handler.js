@@ -59,6 +59,7 @@ const readRSSFileFromS3 = async () => {
       rss: {
         "@_version": "2.0",
         "@_xmlns:atom": "http://www.w3.org/2005/Atom",
+        "@_xmlns:media": "http://search.yahoo.com/mrss/",
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",

@@ -20,7 +20,7 @@ const getCollectionItem = async (id) => {
   };
 
   try {
-    const response = await fetch(`https://api.webflow.com/collections/${collectionID}/items/${id}`, options);
+    const response = await fetch(`https://api.webflow.com/beta/collections/${collectionID}/items/${id}`, options);
     const data = await response.json();
     console.log(data)
     return data;

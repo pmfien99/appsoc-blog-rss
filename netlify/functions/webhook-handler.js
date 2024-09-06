@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path'); 
-const { parse, j2xParser } = require('fast-xml-parser');
+const { XMLBuilder } = require('fast-xml-parser'); 
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); 
 
 const siteId = process.env.WEBFLOW_SITE_ID;

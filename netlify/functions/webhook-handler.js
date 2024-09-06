@@ -1,31 +1,34 @@
-const fs = require('fs');
-const path = require('path'); 
-const { XMLBuilder } = require('fast-xml-parser'); 
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') }); 
+const fs = require("fs");
+const path = require("path");
+const { XMLBuilder } = require("fast-xml-parser");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const siteId = process.env.WEBFLOW_SITE_ID;
 const accessToken = process.env.WEBFLOW_API_ACCESS_TOKEN;
 const collectionID = process.env.POST_COLLECTION_ID;
 
-const rssFilePath = path.resolve(__dirname, 'rss.xml');
+const rssFilePath = path.resolve(__dirname, "rss.xml");
 
 // Function to fetch Webflow collection item
 const getCollectionItem = async (id) => {
   const options = {
-    method: 'GET',
+    method: "GET",
     headers: {
-      accept: 'application/json',
-      authorization: `Bearer ${accessToken}`
-    }
+      accept: "application/json",
+      authorization: `Bearer ${accessToken}`,
+    },
   };
 
   try {
-    const response = await fetch(`https://api.webflow.com/beta/collections/${collectionID}/items/${id}`, options);
+    const response = await fetch(
+      `https://api.webflow.com/beta/collections/${collectionID}/items/${id}`,
+      options
+    );
     const data = await response.json();
-    console.log(data)
+    console.log(data);
     return data;
   } catch (err) {
-    console.error('Error fetching collection item:', err);
+    console.error("Error fetching collection item:", err);
     throw err;
   }
 };
@@ -35,7 +38,7 @@ const readRSSFile = () => {
   if (fs.existsSync(rssFilePath)) {
     console.log("Rss file exists, reading file...");
     try {
-      const rssData = fs.readFileSync(rssFilePath, 'utf8');
+      const rssData = fs.readFileSync(rssFilePath, "utf8");
       console.log("RSS file read successfully");
       return parse(rssData, { ignoreAttributes: false });
     } catch (err) {
@@ -50,10 +53,11 @@ const readRSSFile = () => {
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
-          description: "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
-          item: []
-        }
-      }
+          description:
+            "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
+          item: [],
+        },
+      },
     };
   }
 };
@@ -62,25 +66,27 @@ const readRSSFile = () => {
 const writeRSSFile = (rssData) => {
   console.log("Attempting to write to rss.xml file...");
   try {
-    const builder = new j2xParser({ ignoreAttributes: false, format: true });
-    const xml = builder.parse(rssData);
-    fs.writeFileSync(rssFilePath, xml, 'utf8');
+    const builder = new XMLBuilder({ ignoreAttributes: false, format: true }); 
+    const xml = builder.build(rssData); 
+    fs.writeFileSync(rssFilePath, xml, "utf8");
     console.log("RSS file updated successfully");
   } catch (err) {
     console.error("Error writing to RSS file:", err);
   }
 };
 
+// Function to update the RSS feed
 const updateRSSFeed = (rssData, postData) => {
-  console.log(postData)
+  console.log(postData);
   const postID = postData.id;
-  const postBody = postData.fieldData['post-body']; 
+  const postBody = postData.fieldData["post-body"];
   const postTitle = postData.fieldData.slug;
-  const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`; 
-  const postDescription = postData.fieldData['post-excerpt'];
-  const postDate = new Date(postData.fieldData['post---posted-date']).toUTCString(); 
-  const postImageUrl = postData.fieldData['post-main-image'].url; 
-  
+  const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
+  const postDescription = postData.fieldData["post-excerpt"];
+  const postDate = new Date(
+    postData.fieldData["post---posted-date"]
+  ).toUTCString();
+  const postImageUrl = postData.fieldData["post-main-image"].url;
 
   const rssItem = {
     title: postTitle,
@@ -90,15 +96,17 @@ const updateRSSFeed = (rssData, postData) => {
     pubDate: postDate,
     "media:content": {
       "@_url": postImageUrl,
-      "@_medium": "image"
+      "@_medium": "image",
     },
     "media:thumbnail": {
-      "@_url": postImageUrl
+      "@_url": postImageUrl,
     },
-    "content:encoded": `<![CDATA[${postBody}]]>`
+    "content:encoded": `<![CDATA[${postBody}]]>`,
   };
 
-  const existingItemIndex = rssData.rss.channel.item.findIndex(item => item.guid === postLink);
+  const existingItemIndex = rssData.rss.channel.item.findIndex(
+    (item) => item.guid === postLink
+  );
 
   if (existingItemIndex !== -1) {
     rssData.rss.channel.item[existingItemIndex] = rssItem;
@@ -106,7 +114,9 @@ const updateRSSFeed = (rssData, postData) => {
     rssData.rss.channel.item.push(rssItem);
   }
 
-  rssData.rss.channel.item.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  rssData.rss.channel.item.sort(
+    (a, b) => new Date(b.pubDate) - new Date(a.pubDate)
+  );
 
   writeRSSFile(rssData);
 };
@@ -115,7 +125,9 @@ const updateRSSFeed = (rssData, postData) => {
 const deleteRSSFeedItem = (rssData, postId) => {
   const postLink = `https://www.appsoc.com/blog/${postId}`;
 
-  const itemIndex = rssData.rss.channel.item.findIndex(item => item.guid === postLink);
+  const itemIndex = rssData.rss.channel.item.findIndex(
+    (item) => item.guid === postLink
+  );
 
   if (itemIndex !== -1) {
     rssData.rss.channel.item.splice(itemIndex, 1);
@@ -127,7 +139,6 @@ const deleteRSSFeedItem = (rssData, postId) => {
   writeRSSFile(rssData);
 };
 
-
 // Main handler for the webhook
 exports.handler = async (event) => {
   const body = JSON.parse(event.body);
@@ -136,13 +147,16 @@ exports.handler = async (event) => {
   const rssData = readRSSFile();
 
   if (payload.collectionId === collectionID) {
-    if (triggerType === "collection_item_created" || triggerType === "collection_item_changed") {
+    if (
+      triggerType === "collection_item_created" ||
+      triggerType === "collection_item_changed"
+    ) {
       console.log("Blog created or updated");
 
       if (!payload.isArchived && !payload.isDraft) {
         try {
-          const postData = await getCollectionItem(payload.id); 
-          updateRSSFeed(rssData, postData); 
+          const postData = await getCollectionItem(payload.id);
+          updateRSSFeed(rssData, postData);
         } catch (error) {
           console.error("Error processing collection item:", error);
         }
@@ -154,7 +168,9 @@ exports.handler = async (event) => {
   } else {
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: "Non-blog post webhook received successfully!" }),
+      body: JSON.stringify({
+        message: "Non-blog post webhook received successfully!",
+      }),
     };
   }
 

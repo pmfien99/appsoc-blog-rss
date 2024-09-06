@@ -24,7 +24,7 @@ const getCollectionItem = async (id) => {
 
   try {
     const response = await fetch(
-      `https://api.webflow.com/collections/${process.env.POST_COLLECTION_ID}/items/${id}`,
+      `https://api.webflow.com/beta/collections/${process.env.POST_COLLECTION_ID}/items/${id}`,
       options
     );
     const data = await response.json();

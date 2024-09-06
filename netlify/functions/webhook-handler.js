@@ -1,4 +1,4 @@
-const path = require('path');
+const path = require("path");
 const AWS = require("aws-sdk");
 const { XMLBuilder, XMLParser } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
@@ -6,11 +6,11 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const s3 = new AWS.S3({
   accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY,
-  region: process.env.MY_AWS_REGION, 
+  region: process.env.MY_AWS_REGION,
 });
 
-const bucketName = process.env.MY_S3_BUCKET_NAME; 
-const rssFilePath = "rss.xml"; 
+const bucketName = process.env.MY_S3_BUCKET_NAME;
+const rssFilePath = "rss.xml";
 
 // Function to fetch Webflow collection item
 const getCollectionItem = async (id) => {
@@ -44,9 +44,14 @@ const readRSSFileFromS3 = async () => {
     };
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
+    const parsedRSSData = parse(rssData, { ignoreAttributes: false });
 
-    const parser = new XMLParser({ ignoreAttributes: false });
-    return parser.parse(rssData);
+    // Ensure that item is initialized as an array
+    if (!Array.isArray(parsedRSSData.rss.channel.item)) {
+      parsedRSSData.rss.channel.item = [];
+    }
+
+    return parsedRSSData;
   } catch (err) {
     console.error("Error fetching RSS from S3:", err);
     // Return an empty structure if the file doesn't exist
@@ -59,7 +64,7 @@ const readRSSFileFromS3 = async () => {
           link: "https://www.appsoc.com",
           description:
             "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
-          item: [],
+          item: [], // Initialize item as an empty array
         },
       },
     };

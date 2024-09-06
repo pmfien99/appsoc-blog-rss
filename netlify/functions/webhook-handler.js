@@ -89,8 +89,10 @@ const writeRSSFileToS3 = async (rssData) => {
 
 // Function to update the RSS feed
 const updateRSSFeed = async (rssData, postData) => {
+  console.log("postData:", JSON.stringify(postData, null, 2));
+
   const postID = postData.id;
-  const postBody = postData.fieldData["post-body"];
+  const postBody = postData.fieldData["post-body"] || "No content available";
   const postTitle = postData.fieldData.slug;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
   const postDescription = postData.fieldData["post-excerpt"];

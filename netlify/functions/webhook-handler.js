@@ -1,6 +1,6 @@
 const path = require('path');
 const AWS = require("aws-sdk");
-const { XMLBuilder, parse } = require("fast-xml-parser");
+const { XMLBuilder, XMLParser } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const s3 = new AWS.S3({
@@ -44,7 +44,9 @@ const readRSSFileFromS3 = async () => {
     };
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
-    return parse(rssData, { ignoreAttributes: false });
+
+    const parser = new XMLParser({ ignoreAttributes: false });
+    return parser.parse(rssData);
   } catch (err) {
     console.error("Error fetching RSS from S3:", err);
     // Return an empty structure if the file doesn't exist

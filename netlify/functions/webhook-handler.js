@@ -71,17 +71,18 @@ const writeRSSFile = (rssData) => {
 };
 
 const updateRSSFeed = (rssData, postData) => {
-  const postBody = postData.items[0]['post-body']
-  const postTitle = postData.items[0].name;
-  const postLink = `https://www.appsoc.com/blog/${postData.items[0].slug}`;
-  const postDescription = postData.items[0]['post-excerpt'];
-  const postDate = new Date(postData.items[0]['post---posted-date']).toUTCString();
-  const postImageUrl = postData.items[0]['post-main-image'].url;
+  const postID = postData.id
+  const postBody = postData.fieldData.post-body
+  const postTitle = postData.fieldData.slug
+  const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
+  const postDescription = postData.fieldData.post-excerpt
+  const postDate = new Date(postData.fieldData.post---posted-date).toUTCString();
+  const postImageUrl = postData.fieldData.post-main-image.url;
 
   const rssItem = {
     title: postTitle,
     link: postLink,
-    guid: postLink,
+    guid: postID,
     description: postDescription,
     pubDate: postDate,
     "media:content": {

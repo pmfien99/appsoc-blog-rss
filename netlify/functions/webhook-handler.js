@@ -71,6 +71,7 @@ const writeRSSFile = (rssData) => {
 };
 
 const updateRSSFeed = (rssData, postData) => {
+  console.log(postData)
   const postID = postData.id
   const postBody = postData.fieldData.post-body
   const postTitle = postData.fieldData.slug

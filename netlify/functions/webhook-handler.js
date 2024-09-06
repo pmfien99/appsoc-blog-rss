@@ -1,13 +1,15 @@
-const fs = require("fs");
-const path = require("path");
-const { XMLBuilder } = require("fast-xml-parser");
+const AWS = require("aws-sdk");
+const { XMLBuilder, parse } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
-const siteId = process.env.WEBFLOW_SITE_ID;
-const accessToken = process.env.WEBFLOW_API_ACCESS_TOKEN;
-const collectionID = process.env.POST_COLLECTION_ID;
+const s3 = new AWS.S3({
+  accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY,
+  region: process.env.MY_AWS_REGION, 
+});
 
-const rssFilePath = path.resolve(__dirname, "rss.xml");
+const bucketName = process.env.MY_S3_BUCKET_NAME; 
+const rssFilePath = "rss.xml"; 
 
 // Function to fetch Webflow collection item
 const getCollectionItem = async (id) => {
@@ -15,17 +17,16 @@ const getCollectionItem = async (id) => {
     method: "GET",
     headers: {
       accept: "application/json",
-      authorization: `Bearer ${accessToken}`,
+      authorization: `Bearer ${process.env.WEBFLOW_API_ACCESS_TOKEN}`,
     },
   };
 
   try {
     const response = await fetch(
-      `https://api.webflow.com/beta/collections/${collectionID}/items/${id}`,
+      `https://api.webflow.com/collections/${process.env.POST_COLLECTION_ID}/items/${id}`,
       options
     );
     const data = await response.json();
-    console.log(data);
     return data;
   } catch (err) {
     console.error("Error fetching collection item:", err);
@@ -33,19 +34,19 @@ const getCollectionItem = async (id) => {
   }
 };
 
-// Function to read the existing RSS file
-const readRSSFile = () => {
-  if (fs.existsSync(rssFilePath)) {
-    console.log("Rss file exists, reading file...");
-    try {
-      const rssData = fs.readFileSync(rssFilePath, "utf8");
-      console.log("RSS file read successfully");
-      return parse(rssData, { ignoreAttributes: false });
-    } catch (err) {
-      console.error("Error reading RSS file:", err);
-    }
-  } else {
-    console.log("RSS file does not exist, creating new structure...");
+// Function to read the existing RSS file from S3
+const readRSSFileFromS3 = async () => {
+  try {
+    const params = {
+      Bucket: bucketName,
+      Key: rssFilePath,
+    };
+    const data = await s3.getObject(params).promise();
+    const rssData = data.Body.toString("utf-8");
+    return parse(rssData, { ignoreAttributes: false });
+  } catch (err) {
+    console.error("Error fetching RSS from S3:", err);
+    // Return an empty structure if the file doesn't exist
     return {
       rss: {
         "@_version": "2.0",
@@ -62,22 +63,29 @@ const readRSSFile = () => {
   }
 };
 
-// Function to write the updated RSS data to the file
-const writeRSSFile = (rssData) => {
-  console.log("Attempting to write to rss.xml file...");
+// Function to write the updated RSS data to S3
+const writeRSSFileToS3 = async (rssData) => {
+  const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
+  const xml = builder.build(rssData);
+
+  const params = {
+    Bucket: bucketName,
+    Key: rssFilePath,
+    Body: xml,
+    ContentType: "application/rss+xml",
+  };
+
   try {
-    const builder = new XMLBuilder({ ignoreAttributes: false, format: true }); 
-    const xml = builder.build(rssData); 
-    fs.writeFileSync(rssFilePath, xml, "utf8");
-    console.log("RSS file updated successfully");
+    await s3.putObject(params).promise();
+    console.log("RSS file updated successfully in S3");
   } catch (err) {
-    console.error("Error writing to RSS file:", err);
+    console.error("Error writing RSS file to S3:", err);
+    throw err;
   }
 };
 
 // Function to update the RSS feed
-const updateRSSFeed = (rssData, postData) => {
-  console.log(postData);
+const updateRSSFeed = async (rssData, postData) => {
   const postID = postData.id;
   const postBody = postData.fieldData["post-body"];
   const postTitle = postData.fieldData.slug;
@@ -118,11 +126,11 @@ const updateRSSFeed = (rssData, postData) => {
     (a, b) => new Date(b.pubDate) - new Date(a.pubDate)
   );
 
-  writeRSSFile(rssData);
+  await writeRSSFileToS3(rssData);
 };
 
 // Function to delete a blog post from the RSS feed
-const deleteRSSFeedItem = (rssData, postId) => {
+const deleteRSSFeedItem = async (rssData, postId) => {
   const postLink = `https://www.appsoc.com/blog/${postId}`;
 
   const itemIndex = rssData.rss.channel.item.findIndex(
@@ -136,7 +144,7 @@ const deleteRSSFeedItem = (rssData, postId) => {
     console.log(`Post with ID ${postId} not found in RSS feed`);
   }
 
-  writeRSSFile(rssData);
+  await writeRSSFileToS3(rssData);
 };
 
 // Main handler for the webhook
@@ -144,38 +152,42 @@ exports.handler = async (event) => {
   const body = JSON.parse(event.body);
   const { triggerType, payload } = body;
 
-  const rssData = readRSSFile();
+  try {
+    const rssData = await readRSSFileFromS3();
 
-  if (payload.collectionId === collectionID) {
-    if (
-      triggerType === "collection_item_created" ||
-      triggerType === "collection_item_changed"
-    ) {
-      console.log("Blog created or updated");
+    if (payload.collectionId === process.env.POST_COLLECTION_ID) {
+      if (
+        triggerType === "collection_item_created" ||
+        triggerType === "collection_item_changed"
+      ) {
+        console.log("Blog created or updated");
 
-      if (!payload.isArchived && !payload.isDraft) {
-        try {
+        if (!payload.isArchived && !payload.isDraft) {
           const postData = await getCollectionItem(payload.id);
-          updateRSSFeed(rssData, postData);
-        } catch (error) {
-          console.error("Error processing collection item:", error);
+          await updateRSSFeed(rssData, postData);
         }
+      } else if (triggerType === "collection_item_deleted") {
+        console.log("Blog deleted");
+        await deleteRSSFeedItem(rssData, payload.slug);
       }
-    } else if (triggerType === "collection_item_deleted") {
-      console.log("Blog deleted");
-      deleteRSSFeedItem(rssData, payload.slug);
+    } else {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          message: "Non-blog post webhook received successfully!",
+        }),
+      };
     }
-  } else {
+
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        message: "Non-blog post webhook received successfully!",
-      }),
+      body: JSON.stringify({ message: "Webhook received successfully!" }),
+    };
+  } catch (err) {
+    console.error("Error processing webhook:", err);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
     };
   }
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "Webhook received successfully!" }),
-  };
 };

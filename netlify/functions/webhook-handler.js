@@ -46,7 +46,16 @@ const readRSSFileFromS3 = async () => {
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
 
-    const parser = new XMLParser({ ignoreAttributes: false });
+    // Updated XMLParser configuration
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+      removeNSPrefix: false,
+      cdataTagName: "__cdata",
+      parseTagValue: true,
+      parseAttributeValue: true,
+      trimValues: true,
+    });
     const parsedRSSData = parser.parse(rssData);
 
     // Ensure that item is initialized as an array
@@ -79,11 +88,12 @@ const readRSSFileFromS3 = async () => {
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
-          description: "The AppSOC Security Blog provides a range of expert insights on pressing security topics",
-          'atom:link': {
+          description:
+            "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
+          "atom:link": {
             "@_href": "https://www.appsoc.com/rss.xml",
             "@_rel": "self",
-            "@_type": "application/rss+xml"
+            "@_type": "application/rss+xml",
           },
           item: [],
         },
@@ -94,7 +104,11 @@ const readRSSFileFromS3 = async () => {
 
 // Function to write the updated RSS data to S3
 const writeRSSFileToS3 = async (rssData) => {
-  const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
+  const builder = new XMLBuilder({
+    ignoreAttributes: false,
+    format: true,
+    suppressBooleanAttributes: false,
+  });
   const xml = builder.build(rssData);
 
   const params = {
@@ -123,14 +137,22 @@ const updateRSSFeed = async (rssData, postData) => {
 
   // Sanitize the postBody
   postBody = sanitizeHtml(postBody, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 'img', 'h2', 'ul', 'li', 'p', 'strong', 'a' ]),
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "img",
+      "h2",
+      "ul",
+      "li",
+      "p",
+      "strong",
+      "a",
+    ]),
     allowedAttributes: {
-      'a': [ 'href', 'target', 'id' ],
-      'img': [ 'src', 'alt' ],
-      'p': [ 'id' ],
-      'h2': [ 'id' ],
-      'strong': [ 'id' ]
-    }
+      a: ["href", "target", "id"],
+      img: ["src", "alt"],
+      p: ["id"],
+      h2: ["id"],
+      strong: ["id"],
+    },
   });
 
   console.log("Sanitized postBody:", postBody);
@@ -138,7 +160,9 @@ const updateRSSFeed = async (rssData, postData) => {
   const postTitle = postData.fieldData.slug;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
   const postDescription = postData.fieldData["post-excerpt"];
-  const postDate = new Date(postData.fieldData["post---posted-date"]).toUTCString();
+  const postDate = new Date(
+    postData.fieldData["post---posted-date"]
+  ).toUTCString();
   const postImageUrl = postData.fieldData["post-main-image"].url;
 
   const rssItem = {
@@ -154,7 +178,8 @@ const updateRSSFeed = async (rssData, postData) => {
     "media:thumbnail": {
       "@_url": postImageUrl,
     },
-    "content:encoded": `[CDATA[${postBody}]`, 
+    // Properly handling the CDATA content block
+    "content:encoded": `<![CDATA[${postBody}]]>`,
   };
 
   const existingItemIndex = rssData.rss.channel.item.findIndex(
@@ -168,12 +193,11 @@ const updateRSSFeed = async (rssData, postData) => {
   }
 
   rssData.rss.channel.item.sort(
-    (a, b) => new Date(b.pubDate) - new Date(a.pubDate)
+    (a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
   );
 
   await writeRSSFileToS3(rssData);
 };
-
 
 // Function to delete a blog post from the RSS feed
 const deleteRSSFeedItem = async (rssData, postId) => {

@@ -78,8 +78,12 @@ const readRSSFileFromS3 = async () => {
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
-          description:
-            "The AppSOC Security Blog provides a range of expert insights on pressing security topics",
+          description: "The AppSOC Security Blog provides a range of expert insights on pressing security topics",
+          'atom:link': {
+            "@_href": "https://www.appsoc.com/rss.xml",
+            "@_rel": "self",
+            "@_type": "application/rss+xml"
+          },
           item: [],
         },
       },
@@ -110,16 +114,30 @@ const writeRSSFileToS3 = async (rssData) => {
 
 // Function to update the RSS feed
 const updateRSSFeed = async (rssData, postData) => {
-  console.log("postData:", JSON.stringify(postData, null, 2));
-
   const postID = postData.id;
-  const postBody = postData.fieldData["post-body"] || "No content available";
+  let postBody = postData.fieldData["post-body"] || "No content available";
+
+  // Log the postBody before sanitizing or transforming
+  console.log("Original postBody:", postBody);
+
+  // Sanitize the postBody
+  postBody = sanitizeHtml(postBody, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 'img', 'h2', 'ul', 'li', 'p', 'strong', 'a' ]),
+    allowedAttributes: {
+      'a': [ 'href', 'target', 'id' ],
+      'img': [ 'src', 'alt' ],
+      'p': [ 'id' ],
+      'h2': [ 'id' ],
+      'strong': [ 'id' ]
+    }
+  });
+
+  console.log("Sanitized postBody:", postBody);
+
   const postTitle = postData.fieldData.slug;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
   const postDescription = postData.fieldData["post-excerpt"];
-  const postDate = new Date(
-    postData.fieldData["post---posted-date"]
-  ).toUTCString();
+  const postDate = new Date(postData.fieldData["post---posted-date"]).toUTCString();
   const postImageUrl = postData.fieldData["post-main-image"].url;
 
   const rssItem = {
@@ -135,7 +153,7 @@ const updateRSSFeed = async (rssData, postData) => {
     "media:thumbnail": {
       "@_url": postImageUrl,
     },
-    "content:encoded": `<![CDATA[${postBody}]]>`,
+    "content:encoded": `<![CDATA[${postBody}]]>`, 
   };
 
   const existingItemIndex = rssData.rss.channel.item.findIndex(
@@ -154,6 +172,7 @@ const updateRSSFeed = async (rssData, postData) => {
 
   await writeRSSFileToS3(rssData);
 };
+
 
 // Function to delete a blog post from the RSS feed
 const deleteRSSFeedItem = async (rssData, postId) => {

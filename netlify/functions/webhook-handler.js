@@ -53,6 +53,11 @@ const readRSSFileFromS3 = async () => {
       parsedRSSData.rss.channel.item = [];
     }
 
+    if (!parsedRSSData.rss["@_xmlns:content"]) {
+      parsedRSSData.rss["@_xmlns:content"] = "http://purl.org/rss/1.0/modules/content/";
+    }
+    
+
     return parsedRSSData;
   } catch (err) {
     console.error("Error fetching RSS from S3:", err);

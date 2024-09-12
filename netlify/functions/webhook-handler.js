@@ -154,7 +154,7 @@ const updateRSSFeed = async (rssData, postData) => {
     "media:thumbnail": {
       "@_url": postImageUrl,
     },
-    "content:encoded": `<![CDATA[${postBody}]]>`, 
+    "content:encoded": `[CDATA[${postBody}]`, 
   };
 
   const existingItemIndex = rssData.rss.channel.item.findIndex(

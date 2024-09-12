@@ -158,7 +158,7 @@ const updateRSSFeed = async (rssData, postData) => {
 
   console.log("Sanitized postBody:", postBody);
 
-  const postTitle = postData.fieldData.slug;
+  const postTitle = postData.fieldData.name;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
   const postDescription = postData.fieldData["post-excerpt"];
   const postDate = new Date(

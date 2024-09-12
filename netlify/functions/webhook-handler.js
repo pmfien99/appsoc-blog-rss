@@ -1,5 +1,6 @@
 const path = require("path");
 const AWS = require("aws-sdk");
+const sanitizeHtml = require('sanitize-html');
 const { XMLBuilder, XMLParser } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 

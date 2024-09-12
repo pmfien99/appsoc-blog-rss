@@ -1,6 +1,6 @@
 const path = require("path");
 const AWS = require("aws-sdk");
-const sanitizeHtml = require('sanitize-html');
+const sanitizeHtml = require("sanitize-html");
 const { XMLBuilder, XMLParser } = require("fast-xml-parser");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -91,10 +91,11 @@ const readRSSFileFromS3 = async () => {
           description:
             "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
           "atom:link": {
-            "@_href": "https://www.appsoc.com/rss.xml",
+            "@_href": "https://appsoc-rss.s3.us-east-2.amazonaws.com/rss.xml",
             "@_rel": "self",
             "@_type": "application/rss+xml",
           },
+
           item: [],
         },
       },

@@ -117,7 +117,7 @@ const updateRSSFeed = async (rssData, postData) => {
   const rssItem = {
     title: postTitle,
     link: postLink,
-    guid: postID,
+    guid: postLink,
     description: postDescription,
     pubDate: postDate,
     "media:content": {

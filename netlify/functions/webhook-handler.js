@@ -44,7 +44,9 @@ const readRSSFileFromS3 = async () => {
     };
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
-    const parsedRSSData = parse(rssData, { ignoreAttributes: false });
+
+    const parser = new XMLParser({ ignoreAttributes: false });
+    const parsedRSSData = parser.parse(rssData);
 
     // Ensure that item is initialized as an array
     if (!Array.isArray(parsedRSSData.rss.channel.item)) {
@@ -54,7 +56,6 @@ const readRSSFileFromS3 = async () => {
     return parsedRSSData;
   } catch (err) {
     console.error("Error fetching RSS from S3:", err);
-    // Return an empty structure if the file doesn't exist
     return {
       rss: {
         "@_version": "2.0",

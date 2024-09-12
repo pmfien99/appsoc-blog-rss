@@ -66,8 +66,8 @@ const readRSSFileFromS3 = async () => {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
           description:
-            "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
-          item: [], // Initialize item as an empty array
+            "The AppSOC Security Blog provides a range of expert insights on pressing security topics",
+          item: [], 
         },
       },
     };

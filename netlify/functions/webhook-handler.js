@@ -54,9 +54,17 @@ const readRSSFileFromS3 = async () => {
     }
 
     if (!parsedRSSData.rss["@_xmlns:content"]) {
-      parsedRSSData.rss["@_xmlns:content"] = "http://purl.org/rss/1.0/modules/content/";
+      parsedRSSData.rss["@_xmlns:content"] =
+        "http://purl.org/rss/1.0/modules/content/";
     }
-    
+
+    if (!parsedRSSData.rss.channel["atom:link"]) {
+      parsedRSSData.rss.channel["atom:link"] = {
+        "@_href": "https://www.appsoc.com/rss.xml",
+        "@_rel": "self",
+        "@_type": "application/rss+xml",
+      };
+    }
 
     return parsedRSSData;
   } catch (err) {
@@ -72,7 +80,7 @@ const readRSSFileFromS3 = async () => {
           link: "https://www.appsoc.com",
           description:
             "The AppSOC Security Blog provides a range of expert insights on pressing security topics",
-          item: [], 
+          item: [],
         },
       },
     };

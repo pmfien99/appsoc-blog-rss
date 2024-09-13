@@ -52,7 +52,7 @@ const readRSSFileFromS3 = async () => {
       removeNSPrefix: false,
       cdataTagName: "__cdata",
       parseTagValue: true,
-      parseAttributeValue: true,
+      parseAttributeValue: false,
       trimValues: true,
     });
     const parsedRSSData = parser.parse(rssData);

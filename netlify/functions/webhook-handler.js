@@ -50,11 +50,12 @@ const readRSSFileFromS3 = async () => {
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
       removeNSPrefix: false,
-      cdataTagName: "__cdata",
+      cdataTagName: "__cdata", 
       parseTagValue: true,
       parseAttributeValue: false,
       trimValues: true,
     });
+    
     const parsedRSSData = parser.parse(rssData);
 
     // Ensure items array is initialized
@@ -93,8 +94,10 @@ const writeRSSFileToS3 = async (rssData) => {
     ignoreAttributes: false,
     format: true,
     suppressBooleanAttributes: false,
-    cdataPropName: "__cdata",
+    cdataPropName: "__cdata", 
+    preserveCData: true,
   });
+  
   const xml = builder.build(rssData);
 
   const params = {

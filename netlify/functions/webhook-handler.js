@@ -46,7 +46,6 @@ const readRSSFileFromS3 = async () => {
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
 
-    // Updated XMLParser configuration
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
@@ -58,23 +57,10 @@ const readRSSFileFromS3 = async () => {
     });
     const parsedRSSData = parser.parse(rssData);
 
-    // Ensure that item is initialized as an array
-    if (!Array.isArray(parsedRSSData.rss.channel.item)) {
-      parsedRSSData.rss.channel.item = [];
-    }
-
-    if (!parsedRSSData.rss["@_xmlns:content"]) {
-      parsedRSSData.rss["@_xmlns:content"] =
-        "http://purl.org/rss/1.0/modules/content/";
-    }
-
-    if (!parsedRSSData.rss.channel["atom:link"]) {
-      parsedRSSData.rss.channel["atom:link"] = {
-        "@_href": "https://www.appsoc.com/rss.xml",
-        "@_rel": "self",
-        "@_type": "application/rss+xml",
-      };
-    }
+    // Ensure items array is initialized
+    parsedRSSData.rss.channel.item = Array.isArray(parsedRSSData.rss.channel.item)
+      ? parsedRSSData.rss.channel.item
+      : [];
 
     return parsedRSSData;
   } catch (err) {
@@ -88,14 +74,12 @@ const readRSSFileFromS3 = async () => {
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
-          description:
-            "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
+          description: "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
           "atom:link": {
             "@_href": "https://appsoc-rss.s3.us-east-2.amazonaws.com/rss.xml",
             "@_rel": "self",
             "@_type": "application/rss+xml",
           },
-
           item: [],
         },
       },
@@ -109,6 +93,7 @@ const writeRSSFileToS3 = async (rssData) => {
     ignoreAttributes: false,
     format: true,
     suppressBooleanAttributes: false,
+    cdataTagName: "__cdata",
   });
   const xml = builder.build(rssData);
 
@@ -128,25 +113,17 @@ const writeRSSFileToS3 = async (rssData) => {
   }
 };
 
-// Function to update the RSS feed
-const updateRSSFeed = async (rssData, postData) => {
-  const postID = postData.id;
+// Function to update or add the RSS feed item
+const upsertRSSFeed = async (rssData, postData) => {
+  const postTitle = postData.fieldData.name;
+  const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
+  const postDescription = postData.fieldData["post-excerpt"];
+  const postDate = new Date(postData.fieldData["post---posted-date"]).toUTCString();
+  const postImageUrl = postData.fieldData["post-main-image"].url;
   let postBody = postData.fieldData["post-body"] || "No content available";
 
-  // Log the postBody before sanitizing or transforming
-  console.log("Original postBody:", postBody);
-
-  // Sanitize the postBody
   postBody = sanitizeHtml(postBody, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-      "img",
-      "h2",
-      "ul",
-      "li",
-      "p",
-      "strong",
-      "a",
-    ]),
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h2", "ul", "li", "p", "strong", "a"]),
     allowedAttributes: {
       a: ["href", "target", "id"],
       img: ["src", "alt"],
@@ -155,16 +132,6 @@ const updateRSSFeed = async (rssData, postData) => {
       strong: ["id"],
     },
   });
-
-  console.log("Sanitized postBody:", postBody);
-
-  const postTitle = postData.fieldData.name;
-  const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
-  const postDescription = postData.fieldData["post-excerpt"];
-  const postDate = new Date(
-    postData.fieldData["post---posted-date"]
-  ).toUTCString();
-  const postImageUrl = postData.fieldData["post-main-image"].url;
 
   const rssItem = {
     title: postTitle,
@@ -179,13 +146,12 @@ const updateRSSFeed = async (rssData, postData) => {
     "media:thumbnail": {
       "@_url": postImageUrl,
     },
-    // Properly handling the CDATA content block
-    "content:encoded": `<![CDATA[${postBody}]]>`,
+    "content:encoded": {
+      "__cdata": postBody,
+    },
   };
 
-  const existingItemIndex = rssData.rss.channel.item.findIndex(
-    (item) => item.guid === postLink
-  );
+  const existingItemIndex = rssData.rss.channel.item.findIndex((item) => item.guid === postLink);
 
   if (existingItemIndex !== -1) {
     rssData.rss.channel.item[existingItemIndex] = rssItem;
@@ -200,13 +166,10 @@ const updateRSSFeed = async (rssData, postData) => {
   await writeRSSFileToS3(rssData);
 };
 
-// Function to delete a blog post from the RSS feed
 const deleteRSSFeedItem = async (rssData, postId) => {
   const postLink = `https://www.appsoc.com/blog/${postId}`;
 
-  const itemIndex = rssData.rss.channel.item.findIndex(
-    (item) => item.guid === postLink
-  );
+  const itemIndex = rssData.rss.channel.item.findIndex((item) => item.guid === postLink);
 
   if (itemIndex !== -1) {
     rssData.rss.channel.item.splice(itemIndex, 1);
@@ -218,7 +181,6 @@ const deleteRSSFeedItem = async (rssData, postId) => {
   await writeRSSFileToS3(rssData);
 };
 
-// Main handler for the webhook
 exports.handler = async (event) => {
   const body = JSON.parse(event.body);
   const { triggerType, payload } = body;
@@ -227,15 +189,11 @@ exports.handler = async (event) => {
     const rssData = await readRSSFileFromS3();
 
     if (payload.collectionId === process.env.POST_COLLECTION_ID) {
-      if (
-        triggerType === "collection_item_created" ||
-        triggerType === "collection_item_changed"
-      ) {
+      if (["collection_item_created", "collection_item_changed"].includes(triggerType)) {
         console.log("Blog created or updated");
-
         if (!payload.isArchived && !payload.isDraft) {
           const postData = await getCollectionItem(payload.id);
-          await updateRSSFeed(rssData, postData);
+          await upsertRSSFeed(rssData, postData);
         }
       } else if (triggerType === "collection_item_deleted") {
         console.log("Blog deleted");

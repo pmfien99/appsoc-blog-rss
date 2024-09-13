@@ -60,7 +60,7 @@ const readRSSFileFromS3 = async () => {
     // Ensure items array is initialized
     parsedRSSData.rss.channel.item = Array.isArray(parsedRSSData.rss.channel.item)
       ? parsedRSSData.rss.channel.item
-      : [];
+      : parsedRSSData.rss.channel.item ? [parsedRSSData.rss.channel.item] : [];
 
     return parsedRSSData;
   } catch (err) {
@@ -122,6 +122,7 @@ const upsertRSSFeed = async (rssData, postData) => {
   const postImageUrl = postData.fieldData["post-main-image"].url;
   let postBody = postData.fieldData["post-body"] || "No content available";
 
+  // Sanitize the postBody
   postBody = sanitizeHtml(postBody, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h2", "ul", "li", "p", "strong", "a"]),
     allowedAttributes: {
@@ -151,14 +152,18 @@ const upsertRSSFeed = async (rssData, postData) => {
     },
   };
 
+  // Find existing item
   const existingItemIndex = rssData.rss.channel.item.findIndex((item) => item.guid === postLink);
 
   if (existingItemIndex !== -1) {
+    // Update existing item
     rssData.rss.channel.item[existingItemIndex] = rssItem;
   } else {
+    // Add new item
     rssData.rss.channel.item.push(rssItem);
   }
 
+  // Sort by publication date
   rssData.rss.channel.item.sort(
     (a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
   );
@@ -166,6 +171,7 @@ const upsertRSSFeed = async (rssData, postData) => {
   await writeRSSFileToS3(rssData);
 };
 
+// Function to delete a blog post from the RSS feed
 const deleteRSSFeedItem = async (rssData, postId) => {
   const postLink = `https://www.appsoc.com/blog/${postId}`;
 
@@ -181,6 +187,7 @@ const deleteRSSFeedItem = async (rssData, postId) => {
   await writeRSSFileToS3(rssData);
 };
 
+// Main handler for the webhook
 exports.handler = async (event) => {
   const body = JSON.parse(event.body);
   const { triggerType, payload } = body;

@@ -93,7 +93,7 @@ const writeRSSFileToS3 = async (rssData) => {
     ignoreAttributes: false,
     format: true,
     suppressBooleanAttributes: false,
-    cdataTagName: "__cdata",
+    cdataPropName: "__cdata",
   });
   const xml = builder.build(rssData);
 

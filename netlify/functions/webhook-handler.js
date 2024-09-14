@@ -13,7 +13,13 @@ const s3 = new AWS.S3({
 const bucketName = process.env.MY_S3_BUCKET_NAME;
 const rssFilePath = "rss.xml";
 
-// Function to fetch Webflow collection item
+/**
+ * Handler function to fetch Webflow CMS item
+ * Requires use of API token stored as WEBFLOW_API_ACCESS_TOKEN
+ * 
+ * @param id - THE WEBFLOW ID OF THE ITEM TO BE RETURNED
+ * @returns - THE RESPONSE DATA FROM WEBFLOW AS JSON 
+ */
 const getCollectionItem = async (id) => {
   const options = {
     method: "GET",
@@ -44,7 +50,9 @@ const readRSSFileFromS3 = async () => {
       Key: rssFilePath,
     };
     const data = await s3.getObject(params).promise();
+    console.log("readRSSFileFromS3 data :" + data)
     const rssData = data.Body.toString("utf-8");
+    console.log("readRSSFileFromS3 rssData :" + rssData)
 
     const parser = new XMLParser({
       ignoreAttributes: false,
@@ -57,6 +65,7 @@ const readRSSFileFromS3 = async () => {
     });
     
     const parsedRSSData = parser.parse(rssData);
+    console.log("readRSSFileFromS3 parsedRSSData :" + parsedRSSData)
 
     // Ensure items array is initialized
     parsedRSSData.rss.channel.item = Array.isArray(parsedRSSData.rss.channel.item)
@@ -125,6 +134,9 @@ const upsertRSSFeed = async (rssData, postData) => {
   const postImageUrl = postData.fieldData["post-main-image"].url;
   let postBody = postData.fieldData["post-body"] || "No content available";
 
+  console.log("Upsert RSS Function post data: " + postData);
+  console.log("Upsert RSS Function post body: " + postBody);
+
   // Sanitize the postBody
   postBody = sanitizeHtml(postBody, {
     allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h2", "ul", "li", "p", "strong", "a"]),
@@ -136,6 +148,8 @@ const upsertRSSFeed = async (rssData, postData) => {
       strong: ["id"],
     },
   });
+
+  console.log("Upsert RSS Function post body - SANITIZED: " + postBody);
 
   const rssItem = {
     title: postTitle,
@@ -190,7 +204,13 @@ const deleteRSSFeedItem = async (rssData, postId) => {
   await writeRSSFileToS3(rssData);
 };
 
-// Main handler for the webhook
+
+/**
+ * Netlify Function handler to process webhooks related to blog posts and update the RSS feed accordingly.
+ *
+ * @param event - The Netlify function event payload.
+ * @returns - The response object with statusCode and body.
+ */
 exports.handler = async (event) => {
   const body = JSON.parse(event.body);
   const { triggerType, payload } = body;
@@ -198,15 +218,14 @@ exports.handler = async (event) => {
   try {
     const rssData = await readRSSFileFromS3();
 
+    // POST_COLLECTION_ID is the id of the Webflow CMS collection of interest
     if (payload.collectionId === process.env.POST_COLLECTION_ID) {
       if (["collection_item_created", "collection_item_changed"].includes(triggerType)) {
-        console.log("Blog created or updated");
         if (!payload.isArchived && !payload.isDraft) {
           const postData = await getCollectionItem(payload.id);
           await upsertRSSFeed(rssData, postData);
         }
       } else if (triggerType === "collection_item_deleted") {
-        console.log("Blog deleted");
         await deleteRSSFeedItem(rssData, payload.slug);
       }
     } else {

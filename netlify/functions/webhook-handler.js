@@ -57,14 +57,9 @@ const readRSSFileFromS3 = async () => {
 
     const parser = new xml2js.Parser({
       explicitArray: false,
-      explicitCharkey: false,
-      explicitRoot: false,
       preserveChildrenOrder: true,
-      explicitChildren: false,
       charsAsChildren: false,
-      mergeAttrs: true,
       cdata: true,
-      xmlns: true,
     });
 
     const parsedRSSData = await parser.parseStringPromise(rssData);

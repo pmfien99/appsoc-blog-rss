@@ -50,18 +50,17 @@ const readRSSFileFromS3 = async () => {
       Key: rssFilePath,
     };
     const data = await s3.getObject(params).promise();
-    console.log("readRSSFileFromS3 data :" + data)
     const rssData = data.Body.toString("utf-8");
-    console.log("readRSSFileFromS3 rssData :" + rssData)
 
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: "@_",
       removeNSPrefix: false,
-      cdataTagName: "__cdata", 
-      parseTagValue: true,
+      cdataTagName: "__cdata",
+      parseTagValue: false,
       parseAttributeValue: false,
       trimValues: true,
+      processEntities: false,
     });
     
     const parsedRSSData = parser.parse(rssData);

@@ -1,7 +1,7 @@
 const path = require("path");
 const AWS = require("aws-sdk");
 const sanitizeHtml = require("sanitize-html");
-const { XMLBuilder, XMLParser } = require("fast-xml-parser");
+const xml2js = require("xml2js");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const s3 = new AWS.S3({
@@ -14,11 +14,10 @@ const bucketName = process.env.MY_S3_BUCKET_NAME;
 const rssFilePath = "rss.xml";
 
 /**
- * Handler function to fetch Webflow CMS item
- * Requires use of API token stored as WEBFLOW_API_ACCESS_TOKEN
- * 
- * @param id - THE WEBFLOW ID OF THE ITEM TO BE RETURNED
- * @returns - THE RESPONSE DATA FROM WEBFLOW AS JSON 
+ * Fetches a Webflow CMS item using the provided ID.
+ *
+ * @param {string} id - The Webflow ID of the item to be retrieved.
+ * @returns {Promise<Object>} - The response data from Webflow as JSON.
  */
 const getCollectionItem = async (id) => {
   const options = {
@@ -42,7 +41,11 @@ const getCollectionItem = async (id) => {
   }
 };
 
-// Function to read the existing RSS file from S3
+/**
+ * Reads the existing RSS file from S3 and parses it into a JavaScript object.
+ *
+ * @returns {Promise<Object>} - The parsed RSS data.
+ */
 const readRSSFileFromS3 = async () => {
   try {
     const params = {
@@ -52,42 +55,51 @@ const readRSSFileFromS3 = async () => {
     const data = await s3.getObject(params).promise();
     const rssData = data.Body.toString("utf-8");
 
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-      removeNSPrefix: false,
-      cdataTagName: "__cdata",
-      parseTagValue: false,
-      parseAttributeValue: false,
-      trimValues: true,
-      processEntities: false,
+    const parser = new xml2js.Parser({
+      explicitArray: false,
+      explicitCharkey: false,
+      explicitRoot: false,
+      preserveChildrenOrder: true,
+      explicitChildren: false,
+      charsAsChildren: false,
+      mergeAttrs: true,
+      cdata: true,
+      xmlns: true,
     });
-    
-    const parsedRSSData = parser.parse(rssData);
-    console.log("readRSSFileFromS3 parsedRSSData :" + parsedRSSData)
+
+    const parsedRSSData = await parser.parseStringPromise(rssData);
 
     // Ensure items array is initialized
-    parsedRSSData.rss.channel.item = Array.isArray(parsedRSSData.rss.channel.item)
-      ? parsedRSSData.rss.channel.item
-      : parsedRSSData.rss.channel.item ? [parsedRSSData.rss.channel.item] : [];
+    const items = parsedRSSData.rss.channel.item;
+    parsedRSSData.rss.channel.item = items
+      ? Array.isArray(items)
+        ? items
+        : [items]
+      : [];
 
     return parsedRSSData;
   } catch (err) {
     console.error("Error fetching RSS from S3:", err);
+    // Return a default RSS structure if the file doesn't exist or is malformed
     return {
       rss: {
-        "@_version": "2.0",
-        "@_xmlns:atom": "http://www.w3.org/2005/Atom",
-        "@_xmlns:media": "http://search.yahoo.com/mrss/",
-        "@_xmlns:content": "http://purl.org/rss/1.0/modules/content/",
+        $: {
+          version: "2.0",
+          "xmlns:atom": "http://www.w3.org/2005/Atom",
+          "xmlns:media": "http://search.yahoo.com/mrss/",
+          "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
+        },
         channel: {
           title: "AppSOC Security Blog",
           link: "https://www.appsoc.com",
-          description: "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
+          description:
+            "The AppSOC Security Blog provides a range of expert insights on pressing security topics.",
           "atom:link": {
-            "@_href": "https://appsoc-rss.s3.us-east-2.amazonaws.com/rss.xml",
-            "@_rel": "self",
-            "@_type": "application/rss+xml",
+            $: {
+              href: "https://appsoc-rss.s3.us-east-2.amazonaws.com/rss.xml",
+              rel: "self",
+              type: "application/rss+xml",
+            },
           },
           item: [],
         },
@@ -96,17 +108,20 @@ const readRSSFileFromS3 = async () => {
   }
 };
 
-// Function to write the updated RSS data to S3
+/**
+ * Writes the updated RSS data to S3.
+ *
+ * @param {Object} rssData - The RSS data object to be converted to XML and uploaded.
+ * @returns {Promise<void>}
+ */
 const writeRSSFileToS3 = async (rssData) => {
-  const builder = new XMLBuilder({
-    ignoreAttributes: false,
-    format: true,
-    suppressBooleanAttributes: false,
-    cdataPropName: "__cdata", 
-    preserveCData: true,
+  const builder = new xml2js.Builder({
+    cdata: true,
+    renderOpts: { pretty: true },
+    headless: true,
   });
-  
-  const xml = builder.build(rssData);
+
+  const xml = builder.buildObject(rssData);
 
   const params = {
     Bucket: bucketName,
@@ -124,7 +139,13 @@ const writeRSSFileToS3 = async (rssData) => {
   }
 };
 
-// Function to update or add the RSS feed item
+/**
+ * Updates or adds an RSS feed item based on the provided post data.
+ *
+ * @param {Object} rssData - The current RSS data object.
+ * @param {Object} postData - The post data retrieved from Webflow.
+ * @returns {Promise<void>}
+ */
 const upsertRSSFeed = async (rssData, postData) => {
   const postTitle = postData.fieldData.name;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
@@ -133,12 +154,17 @@ const upsertRSSFeed = async (rssData, postData) => {
   const postImageUrl = postData.fieldData["post-main-image"].url;
   let postBody = postData.fieldData["post-body"] || "No content available";
 
-  console.log("Upsert RSS Function post data: " + postData);
-  console.log("Upsert RSS Function post body: " + postBody);
-
   // Sanitize the postBody
   postBody = sanitizeHtml(postBody, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h2", "ul", "li", "p", "strong", "a"]),
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "img",
+      "h2",
+      "ul",
+      "li",
+      "p",
+      "strong",
+      "a",
+    ]),
     allowedAttributes: {
       a: ["href", "target", "id"],
       img: ["src", "alt"],
@@ -148,8 +174,6 @@ const upsertRSSFeed = async (rssData, postData) => {
     },
   });
 
-  console.log("Upsert RSS Function post body - SANITIZED: " + postBody);
-
   const rssItem = {
     title: postTitle,
     link: postLink,
@@ -157,29 +181,34 @@ const upsertRSSFeed = async (rssData, postData) => {
     description: postDescription,
     pubDate: postDate,
     "media:content": {
-      "@_url": postImageUrl,
-      "@_medium": "image",
+      $: {
+        url: postImageUrl,
+        medium: "image",
+      },
     },
     "media:thumbnail": {
-      "@_url": postImageUrl,
+      $: {
+        url: postImageUrl,
+      },
     },
     "content:encoded": {
-      "__cdata": postBody,
+      $: {
+        "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
+      },
+      _: postBody, 
     },
   };
 
-  // Find existing item
-  const existingItemIndex = rssData.rss.channel.item.findIndex((item) => item.guid === postLink);
+  const existingItemIndex = rssData.rss.channel.item.findIndex(
+    (item) => item.guid === postLink
+  );
 
   if (existingItemIndex !== -1) {
-    // Update existing item
     rssData.rss.channel.item[existingItemIndex] = rssItem;
   } else {
-    // Add new item
     rssData.rss.channel.item.push(rssItem);
   }
 
-  // Sort by publication date
   rssData.rss.channel.item.sort(
     (a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
   );
@@ -187,11 +216,19 @@ const upsertRSSFeed = async (rssData, postData) => {
   await writeRSSFileToS3(rssData);
 };
 
-// Function to delete a blog post from the RSS feed
+/**
+ * Deletes a blog post from the RSS feed based on the provided post ID.
+ *
+ * @param {Object} rssData - The current RSS data object.
+ * @param {string} postId - The ID of the post to be deleted.
+ * @returns {Promise<void>}
+ */
 const deleteRSSFeedItem = async (rssData, postId) => {
   const postLink = `https://www.appsoc.com/blog/${postId}`;
 
-  const itemIndex = rssData.rss.channel.item.findIndex((item) => item.guid === postLink);
+  const itemIndex = rssData.rss.channel.item.findIndex(
+    (item) => item.guid === postLink
+  );
 
   if (itemIndex !== -1) {
     rssData.rss.channel.item.splice(itemIndex, 1);
@@ -203,12 +240,11 @@ const deleteRSSFeedItem = async (rssData, postId) => {
   await writeRSSFileToS3(rssData);
 };
 
-
 /**
  * Netlify Function handler to process webhooks related to blog posts and update the RSS feed accordingly.
  *
- * @param event - The Netlify function event payload.
- * @returns - The response object with statusCode and body.
+ * @param {Object} event - The Netlify function event payload.
+ * @returns {Object} - The response object with statusCode and body.
  */
 exports.handler = async (event) => {
   const body = JSON.parse(event.body);
@@ -219,7 +255,11 @@ exports.handler = async (event) => {
 
     // POST_COLLECTION_ID is the id of the Webflow CMS collection of interest
     if (payload.collectionId === process.env.POST_COLLECTION_ID) {
-      if (["collection_item_created", "collection_item_changed"].includes(triggerType)) {
+      if (
+        ["collection_item_created", "collection_item_changed"].includes(
+          triggerType
+        )
+      ) {
         if (!payload.isArchived && !payload.isDraft) {
           const postData = await getCollectionItem(payload.id);
           await upsertRSSFeed(rssData, postData);

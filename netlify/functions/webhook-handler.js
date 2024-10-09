@@ -257,6 +257,7 @@ exports.handler = async (event) => {
       ) {
         if (!payload.isArchived && !payload.isDraft) {
           const postData = await getCollectionItem(payload.id);
+          console.log("Post data:", postData);
           await upsertRSSFeed(rssData, postData);
         }
       } else if (triggerType === "collection_item_deleted") {

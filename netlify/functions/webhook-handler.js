@@ -145,7 +145,9 @@ const upsertRSSFeed = async (rssData, postData) => {
   const postTitle = postData.fieldData.name;
   const postLink = `https://www.appsoc.com/blog/${postData.fieldData.slug}`;
   const postDescription = postData.fieldData["post-excerpt"];
-  const postDate = new Date(postData.fieldData["post---posted-date"]).toUTCString();
+  const postDate = new Date(
+    postData.fieldData["post---posted-date"]
+  ).toUTCString();
   const postImageUrl = postData.fieldData["post-main-image"].url;
   let postBody = postData.fieldData["post-body"] || "No content available";
 
@@ -190,7 +192,7 @@ const upsertRSSFeed = async (rssData, postData) => {
       $: {
         "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
       },
-      _: postBody, 
+      _: postBody,
     },
   };
 
@@ -250,18 +252,22 @@ exports.handler = async (event) => {
 
     // POST_COLLECTION_ID is the id of the Webflow CMS collection of interest
     if (payload.collectionId === process.env.POST_COLLECTION_ID) {
-      if (
-        ["collection_item_created", "collection_item_changed"].includes(
-          triggerType
-        )
-      ) {
-        if (!payload.isArchived && !payload.isDraft) {
-          const postData = await getCollectionItem(payload.id);
-          console.log("Post data:", postData);
-          await upsertRSSFeed(rssData, postData);
+      const postData = await getCollectionItem(payload.id);
+
+      if (postData.fieldData["exclude-from-rss"] === false) {
+        if (
+          ["collection_item_created", "collection_item_changed"].includes(
+            triggerType
+          )
+        ) {
+          if (!payload.isArchived && !payload.isDraft) {
+            await upsertRSSFeed(rssData, postData);
+          }
+        } else if (triggerType === "collection_item_deleted") {
+          await deleteRSSFeedItem(rssData, payload.slug);
         }
-      } else if (triggerType === "collection_item_deleted") {
-        await deleteRSSFeedItem(rssData, payload.slug);
+      } else {
+        console.log("Post is set to be excluded from RSS feed");
       }
     } else {
       return {

@@ -268,6 +268,12 @@ exports.handler = async (event) => {
         }
       } else {
         console.log("Post is set to be excluded from RSS feed");
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: "Post is set to be excluded from RSS feed!",
+          }),
+        };
       }
     } else {
       return {
